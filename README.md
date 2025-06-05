@@ -84,3 +84,20 @@ The script will generate an HTML file in the same directory containing the aggre
 ```
 
 *(Note: Other files like `news_coding.py` and `news_it.py` might exist but `news.py` is the primary entry point with configurable options)*
+
+
+
+curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=REDACTED_REVOKED_KEY" \
+  -H 'Content-Type: application/json' \
+  -X POST \
+  -d '{
+    "contents": [
+      {
+        "parts": [
+          {
+            "text": "Explain how AI works in a few words"
+          }
+        ]
+      }
+    ]
+  }'

@@ -1,14 +1,10 @@
-# Configuration for IT News Aggregator (news.py)
+# Configuration for the News Collector agent pipeline (.claude/agents/)
 
-# LLM Rate Limiting (in seconds)
-LLM_RATE_LIMIT_SECONDS = 6
+# Relevanzpruefung und Uebersetzung machen die Claude-Agenten in .claude/agents/ selbst.
+# Hier stehen nur Datenquellen, Vorfilter-Keywords und Kategorien - keine LLM-Parameter.
 
-# Claude wird per CLI (bash) aufgerufen - kein API-Key noetig, die CLI-Session authentifiziert.
-CLAUDE_CLI_PATH = "claude"
-
-# Default Claude Model Name
-CLAUDE_MODEL_NAME = "sonnet"  # Or your preferred model (sonnet, opus, haiku, or a full model id)
-CLAUDE_TIMEOUT_SECONDS = 120  # Timeout pro Claude-CLI-Aufruf
+# Quellen, die bereits deutsch sind und nicht uebersetzt werden
+GERMAN_SOURCES = ["Heise Online", "Golem.de", "t3n", "Computerwoche", "ZDNet.de"]
 
 # RSS Feeds of major IT news sources
 NEWS_SOURCES = {
@@ -218,3 +214,18 @@ TRANSLATIONS_IT = {
     'malware': 'Schadsoftware',
     'ransomware': 'Ransomware'
 }
+# Kategorien fuer den news-relevance-judge. Freitext - der Agent liest sie als Massstab.
+IT_CATEGORIES_FOR_LLM_PROMPT = """
+- Softwareentwicklung: Programmiersprachen, Frameworks, Tools, Entwicklerpraxis
+- KI und Machine Learning: Modelle, Anwendungen, Forschung, Regulierung
+- IT-Sicherheit: Schwachstellen, Angriffe, Datenlecks, Kryptografie
+- Cloud und Infrastruktur: Betrieb, Container, Netzwerke, Rechenzentren
+- Daten und Datenbanken: Speicherung, Analyse, Datenschutz aus technischer Sicht
+- Hardware und Chips: Prozessoren, Geraete, Halbleiterindustrie
+- Open Source: Projekte, Lizenzen, Communities
+- Tech-Branche: relevante Produkt- und Unternehmensnachrichten mit technischem Kern
+
+NICHT relevant: reine Kaufberatung und Produkttests ohne technischen Kern, Werbung und
+Affiliate-Inhalte, Gaming-Unterhaltung ohne Technikbezug, Consumer-Lifestyle,
+allgemeine Wirtschafts- oder Politiknachrichten ohne IT-Bezug.
+"""

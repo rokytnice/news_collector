@@ -1,14 +1,10 @@
 # Configuration for Political News Aggregator (news.py)
 
-# LLM Rate Limiting (in seconds)
-LLM_RATE_LIMIT_SECONDS = 6
+# Relevanzpruefung und Uebersetzung machen die Claude-Agenten in .claude/agents/ selbst.
+# Hier stehen nur Datenquellen, Vorfilter-Keywords und Kategorien - keine LLM-Parameter.
 
-# Claude wird per CLI (bash) aufgerufen - kein API-Key noetig, die CLI-Session authentifiziert.
-CLAUDE_CLI_PATH = "claude"
-
-# Default Claude Model Name
-CLAUDE_MODEL_NAME = "sonnet"  # Or your preferred model (sonnet, opus, haiku, or a full model id)
-CLAUDE_TIMEOUT_SECONDS = 120  # Timeout pro Claude-CLI-Aufruf
+# Quellen, die bereits deutsch sind und nicht uebersetzt werden
+GERMAN_SOURCES = ["Heise Online", "Golem.de", "t3n", "Computerwoche", "ZDNet.de"]
 
 # RSS Feeds of major political news sources worldwide
 NEWS_SOURCES = {

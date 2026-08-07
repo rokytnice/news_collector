@@ -1,103 +1,84 @@
-# IT News Aggregator
+# News Collector
 
-This project is an IT news aggregator that collects and summarizes IT-related news from various RSS feeds. It uses a Large Language Model (LLM) for relevance filtering and translation, and streams the results into an HTML file.
+Sammelt Nachrichten aus RSS-Feeds, filtert sie nach Relevanz, übersetzt sie ins Deutsche und
+erzeugt einen HTML-Report.
 
-## Features
+Die Arbeit erledigen **Claude-Agenten**, nicht ein Programm mit LLM-Aufrufen. Früher rief ein
+Python-Skript pro Artikel ein LLM über eine REST-API auf; heute ist jede Entscheidungsstufe ein
+eigener Agent, und Code gibt es nur noch für das, was deterministisch ist.
 
-- **RSS Feed Collection:** Gathers news from a predefined list of IT news sources.
-- **LLM-based Filtering:** Uses Claude via the `claude` CLI (bash) to check the relevance of articles based on defined IT categories.
-- **LLM-based Translation:** Translates non-German article titles and summaries into German using Claude.
-- **HTML Output:** Streams the processed news articles into a single HTML file for easy viewing.
-- **Configurable Sources and Keywords:** Allows defining news sources, pre-filter keywords, and LLM categories in separate configuration files.
-- **Command-line Configuration:** Supports specifying the configuration file to use via a command-line argument.
+## Architektur
+
+```
+news-fetcher          RSS holen, 24h-Fenster, Keyword-Vorfilter, Dedup   -> candidates.jsonl
+        ↓
+news-relevance-judge  Relevanz gegen die Config-Kategorien entscheiden   -> relevant.jsonl
+        ↓
+news-translator       nicht-deutsche Artikel übersetzen                  -> translated.jsonl
+        ↓
+news-reporter         HTML-Report rendern + verifizieren                 -> it_nachrichten_*.html
+```
+
+Die Agenten liegen in [`.claude/agents/`](.claude/agents/). `news-relevance-judge` und
+`news-translator` denken selbst — sie rufen **kein** LLM auf. Das spart gegenüber der alten
+Lösung zwei bis drei API-Calls pro Artikel und das 6-Sekunden-Rate-Limit dazwischen.
+
+[`feed_tools.py`](feed_tools.py) ist der deterministische Rest: HTTP, Zeitfenster,
+Keyword-Vorfilter, Deduplizierung, HTML-Rendering. Ohne jede LLM-Logik.
+
+## LLM-Policy
+
+Claude ist das **einzige** LLM in diesem Projekt. Kein Gemini, kein OpenAI, kein DeepL,
+keine Google-API — weder im Code noch in den Agenten. Auch `claude -p` aus Python heraus ist
+verboten: ein Agent, der ein LLM aufruft, um zu denken, ist ein Designfehler.
 
 ## Setup
 
-### Prerequisites
+```bash
+pip install requests feedparser
+```
 
-- Python 3.6 or higher
-- `pip` package installer
+Kein API-Key nötig — die Agenten laufen in deiner Claude-Code-Session.
 
-### Installation
+## Nutzung
 
-1. Clone the repository:
-   ```bash
-   git clone <repository_url>
-   cd news_collector
-   ```
-2. Install the required Python packages:
-   ```bash
-   pip install -r requirements.txt
-   ```
-   *(Note: A `requirements.txt` file is assumed. If it doesn't exist, you may need to create one with `requests` and `feedparser`.)*
+Pipeline in Claude Code starten, z. B.:
 
-3. Make sure the Claude CLI is installed and logged in — it is the only LLM this project uses:
-   ```bash
-   claude --version
-   claude -p "ping"
-   ```
-   No API key is required; the CLI session handles authentication. If `claude` is not on your
-   `PATH`, point the script at it:
-   ```bash
-   export CLAUDE_CLI_PATH=/home/aroc/.local/bin/claude
-   ```
+> Sammle die IT-News der letzten 24 Stunden mit config_it.
 
-## Configuration
+Claude legt einen Run-Ordner unter `_work/news/<timestamp>/` an und beauftragt die vier Agenten
+nacheinander. Details und Parallelisierung: [`CLAUDE.md`](CLAUDE.md).
 
-Configuration settings are stored in separate Python files.
-
-- [`config.py`](config.py): Contains the default configuration, including news sources, pre-filter keywords, LLM categories, LLM rate limit, and the Claude CLI path/model name.
-- [`config_it.py`](config_it.py): Contains an alternative set of news sources, keywords, and translations, specifically tailored for IT news.
-
-You can create your own configuration files following the same structure.
-
-## Usage
-
-Run the `news.py` script from the terminal.
-
-To use the default configuration (`config.py`):
+Die Werkzeuge lassen sich auch direkt aufrufen:
 
 ```bash
-python news.py
+# Kandidaten holen (nur RSS, keine Bewertung)
+python feed_tools.py fetch --config config_it --out _work/news/candidates.jsonl --hours 24
+
+# nur eine Teilmenge der Quellen (für parallele Fetcher)
+python feed_tools.py fetch --config config_it --sources 'Heise Online|Golem.de' --out part1.jsonl
+
+# fertige Artikel rendern
+python feed_tools.py render --in translated.jsonl --out report.html --only-relevant
 ```
 
-Or explicitly specify the default configuration:
+## Konfiguration
 
-```bash
-python news.py --config config
-```
+| Datei | Inhalt |
+|-------|--------|
+| `config_it.py` | IT-News: 164 Quellen, Vorfilter-Keywords, IT-Kategorien |
+| `config_coding.py` | derzeit inhaltsgleich mit `config_politics.py` (Politik-Quellen) |
+| `config_politics.py` | Politik: 126 Quellen, Keywords, Politik-Kategorien |
 
-To use an alternative configuration, for example, `config_it.py`:
+Pro Config: `NEWS_SOURCES`, Vorfilter-Keywords (`IT_KEYWORDS_PREFILTER` oder `IT_KEYWORDS_IT`),
+`IT_CATEGORIES_FOR_LLM_PROMPT` als Relevanzmaßstab, `GERMAN_SOURCES` für die Übersetzungs-Ausnahme.
 
-```bash
-python news.py --config config_it
-```
-
-Replace `config_it` with the name of your desired configuration file (without the `.py` extension).
-
-The script will generate an HTML file in the same directory containing the aggregated news.
-
-## File Structure
+## Dateistruktur
 
 ```
-.
-├── news.py             # Main script to run the aggregator
-├── config.py           # Default configuration settings
-├── config_it.py        # Alternative IT-specific configuration
-├── requirements.txt    # Project dependencies
-└── README.md           # Project documentation
-```
-
-*(Note: Other files like `news_coding.py` and `news_it.py` might exist but `news.py` is the primary entry point with configurable options)*
-
-
-
-## LLM policy
-
-Claude via the `claude` CLI is the **only** LLM used in this project. Do not add other providers.
-Manual smoke test of the same call the script makes:
-
-```bash
-echo 'Antworte NUR mit JA oder NEIN: Ist Python eine Programmiersprache?' | \
-  claude -p --model sonnet --output-format text --allowedTools "" --strict-mcp-config
+.claude/agents/     Die vier Pipeline-Agenten
+feed_tools.py       Deterministische Werkzeuge (fetch, render)
+config_*.py         Quellen, Keywords, Kategorien
+_work/news/<run>/   Zwischenstände eines Laufs (nicht in Git)
+_wiki/              Architektur- und Entscheidungsdoku
 ```

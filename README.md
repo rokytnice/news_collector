@@ -5,8 +5,8 @@ This project is an IT news aggregator that collects and summarizes IT-related ne
 ## Features
 
 - **RSS Feed Collection:** Gathers news from a predefined list of IT news sources.
-- **LLM-based Filtering:** Uses a Gemini LLM via REST API to check the relevance of articles based on defined IT categories.
-- **LLM-based Translation:** Translates non-German article titles and summaries into German using a Gemini LLM.
+- **LLM-based Filtering:** Uses Claude via the `claude` CLI (bash) to check the relevance of articles based on defined IT categories.
+- **LLM-based Translation:** Translates non-German article titles and summaries into German using Claude.
 - **HTML Output:** Streams the processed news articles into a single HTML file for easy viewing.
 - **Configurable Sources and Keywords:** Allows defining news sources, pre-filter keywords, and LLM categories in separate configuration files.
 - **Command-line Configuration:** Supports specifying the configuration file to use via a command-line argument.
@@ -29,19 +29,24 @@ This project is an IT news aggregator that collects and summarizes IT-related ne
    ```bash
    pip install -r requirements.txt
    ```
-   *(Note: A `requirements.txt` file is assumed. If it doesn't exist, you may need to create one with `requests`, `feedparser`, and potentially `google-generativeai` if using the client library instead of REST API directly)*
+   *(Note: A `requirements.txt` file is assumed. If it doesn't exist, you may need to create one with `requests` and `feedparser`.)*
 
-3. Set your Gemini API key as an environment variable:
+3. Make sure the Claude CLI is installed and logged in — it is the only LLM this project uses:
    ```bash
-   export GEMINI_API_KEY='YOUR_API_KEY'
+   claude --version
+   claude -p "ping"
    ```
-   Replace `'YOUR_API_KEY'` with your actual Gemini API key.
+   No API key is required; the CLI session handles authentication. If `claude` is not on your
+   `PATH`, point the script at it:
+   ```bash
+   export CLAUDE_CLI_PATH=/home/aroc/.local/bin/claude
+   ```
 
 ## Configuration
 
 Configuration settings are stored in separate Python files.
 
-- [`config.py`](config.py): Contains the default configuration, including news sources, pre-filter keywords, LLM categories, LLM rate limit, and Gemini API endpoint/model name.
+- [`config.py`](config.py): Contains the default configuration, including news sources, pre-filter keywords, LLM categories, LLM rate limit, and the Claude CLI path/model name.
 - [`config_it.py`](config_it.py): Contains an alternative set of news sources, keywords, and translations, specifically tailored for IT news.
 
 You can create your own configuration files following the same structure.
@@ -87,17 +92,12 @@ The script will generate an HTML file in the same directory containing the aggre
 
 
 
-curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=REDACTED_REVOKED_KEY" \
-  -H 'Content-Type: application/json' \
-  -X POST \
-  -d '{
-    "contents": [
-      {
-        "parts": [
-          {
-            "text": "Explain how AI works in a few words"
-          }
-        ]
-      }
-    ]
-  }'
+## LLM policy
+
+Claude via the `claude` CLI is the **only** LLM used in this project. Do not add other providers.
+Manual smoke test of the same call the script makes:
+
+```bash
+echo 'Antworte NUR mit JA oder NEIN: Ist Python eine Programmiersprache?' | \
+  claude -p --model sonnet --output-format text --allowedTools "" --strict-mcp-config
+```

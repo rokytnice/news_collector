@@ -2,7 +2,7 @@
 """
 IT-Nachrichten Aggregator
 Sammelt und fasst IT-Coding-Nachrichten der letzten 24 Stunden zusammen,
-prüft Relevanz und übersetzt mit Gemini LLM via REST API.
+prüft Relevanz und übersetzt mit Claude via CLI (bash).
 Streamt Ergebnisse in die HTML-Datei.
 """
 
@@ -19,6 +19,8 @@ import logging
 import os
 import argparse
 import importlib
+import shutil
+import subprocess
 
 # Logging konfigurieren
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -36,18 +38,20 @@ class NewsAggregator:
 
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 NewsAggregator/1.1',
-            'Content-Type': 'application/json'  # Wichtig für POST-Requests an Gemini API
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 NewsAggregator/1.1'
         })
 
-        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
-        self.gemini_model_name = self.config.GEMINI_MODEL_NAME # Oder dein bevorzugtes Modell
+        self.claude_cli_path = os.getenv("CLAUDE_CLI_PATH", self.config.CLAUDE_CLI_PATH)
+        self.claude_model_name = self.config.CLAUDE_MODEL_NAME  # Oder dein bevorzugtes Modell
+        self.claude_timeout = self.config.CLAUDE_TIMEOUT_SECONDS
         self.last_llm_call_time = 0  # Zeitstempel der letzten LLM-Abfrage (Unix-Zeit)
 
-        if not self.gemini_api_key:
-            logger.warning("GEMINI_API_KEY environment variable not set. LLM features will be disabled.")
+        self.llm_available = shutil.which(self.claude_cli_path) is not None
+        if not self.llm_available:
+            logger.warning(
+                f"Claude CLI ('{self.claude_cli_path}') nicht gefunden. LLM-Features sind deaktiviert.")
         else:
-            logger.info(f"Gemini LLM ({self.gemini_model_name}) will be used via REST API.")
+            logger.info(f"Claude ({self.claude_model_name}) wird via CLI genutzt.")
 
     def _wait_for_llm_throttle(self):
         """Wartet, um die LLM-Abfragerate zu begrenzen."""
@@ -59,78 +63,58 @@ class NewsAggregator:
             time.sleep(sleep_duration)
         self.last_llm_call_time = time.time()
 
-    def _call_gemini_api(self, prompt_text: str) -> Optional[str]:
+    def _call_claude_cli(self, prompt_text: str) -> Optional[str]:
         """
-        Sendet eine Anfrage an die Gemini API und gibt die Textantwort zurück.
+        Ruft Claude über die CLI (`claude -p`) auf und gibt die Textantwort zurück.
+        Der Prompt wird über stdin übergeben, damit weder Länge noch Quoting Probleme machen.
         """
-        if not self.gemini_api_key:
-            logger.warning("Gemini API key not available. Skipping LLM call.")
+        if not self.llm_available:
+            logger.warning("Claude CLI nicht verfügbar. LLM-Aufruf wird übersprungen.")
             return None
 
         self._wait_for_llm_throttle()
 
-        api_url = self.config.GEMINI_API_ENDPOINT_TEMPLATE.format(model=self.gemini_model_name, api_key=self.gemini_api_key)
-
-        payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {"text": prompt_text}
-                    ]
-                }
-            ],
-            "generationConfig": {
-                "temperature": 0.7,
-                "topK": 1,
-                "topP": 1,
-                "maxOutputTokens": 2048,
-            }
-        }
-        logger.info(f"Sending request to Gemini API: {api_url}")
-        logger.debug(f"Gemini API Request Payload: {json.dumps(payload, indent=2)}")
+        cmd = [
+            self.claude_cli_path,
+            "-p",
+            "--model", self.claude_model_name,
+            "--output-format", "text",
+            "--allowedTools", "",       # keine Tool-Nutzung, reine Textantwort
+            "--strict-mcp-config",      # keine MCP-Server laden -> schneller Start
+        ]
+        logger.info(f"Rufe Claude CLI auf: {' '.join(cmd)}")
+        logger.debug(f"Claude Prompt:\n{prompt_text}")
 
         try:
-            response = self.session.post(api_url, json=payload, timeout=30)
-            logger.debug(f"Gemini API Response Status Code: {response.status_code}")
-            logger.debug(f"Gemini API Response Headers: {response.headers}")
-            response.raise_for_status()
-            response_data = response.json()
-            logger.debug(f"Gemini API Response JSON: {json.dumps(response_data, indent=2)}")
-
-            if response_data.get("candidates") and \
-                    len(response_data["candidates"]) > 0 and \
-                    response_data["candidates"][0].get("content") and \
-                    response_data["candidates"][0]["content"].get("parts") and \
-                    len(response_data["candidates"][0]["content"]["parts"]) > 0 and \
-                    response_data["candidates"][0]["content"]["parts"][0].get("text"):
-                generated_text = response_data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                logger.info("Successfully received and parsed response from Gemini API.")
-                return generated_text
-            else:
+            result = subprocess.run(
+                cmd,
+                input=prompt_text,
+                capture_output=True,
+                text=True,
+                timeout=self.claude_timeout,
+            )
+            if result.returncode != 0:
                 logger.error(
-                    f"Unerwartete Antwortstruktur von Gemini API (nach erfolgreichem Status Code): {response_data}")
+                    f"Claude CLI beendet mit Exit-Code {result.returncode}: {result.stderr.strip()}")
                 return None
-        except requests.exceptions.Timeout:
-            logger.error(f"Timeout bei der Anfrage an Gemini API ({api_url}).")
-            return None
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Fehler bei der Anfrage an Gemini API ({api_url}): {e}")
-            if e.response is not None:
-                logger.error(f"Gemini API Error Response Status Code: {e.response.status_code}")
-                logger.error(f"Gemini API Error Response Content: {e.response.text}")
-            return None
-        except json.JSONDecodeError as e:
-            logger.error(f"Fehler beim Parsen der JSON-Antwort von Gemini API: {e}")
-            if response is not None:
-                logger.error(f"Gemini API Raw Response Text (JSONDecodeError): {response.text}")
+
+            generated_text = result.stdout.strip()
+            if not generated_text:
+                logger.error(f"Leere Antwort von Claude CLI. stderr: {result.stderr.strip()}")
+                return None
+
+            logger.debug(f"Claude Antwort: {generated_text}")
+            return generated_text
+        except subprocess.TimeoutExpired:
+            logger.error(f"Timeout ({self.claude_timeout}s) beim Aufruf der Claude CLI.")
             return None
         except Exception as e:
-            logger.error(f"Allgemeiner Fehler beim Aufruf der Gemini API: {e}")
+            logger.error(f"Allgemeiner Fehler beim Aufruf der Claude CLI: {e}")
             return None
 
     def is_article_relevant_with_llm(self, title: str, summary: str) -> bool:
-        """Prüft mit Gemini LLM, ob ein Artikel zu den definierten IT-Kategorien passt."""
-        if not self.gemini_api_key:
+        """Prüft mit Claude, ob ein Artikel zu den definierten IT-Kategorien passt."""
+        if not self.llm_available:
             return False
 
         prompt_text = f"""
@@ -146,7 +130,7 @@ class NewsAggregator:
         Ist dieser Artikel relevant für diese IT-Bereiche?
         Antworte NUR mit "JA" oder "NEIN".
         """
-        response_text = self._call_gemini_api(prompt_text)
+        response_text = self._call_claude_cli(prompt_text)
         if response_text:
             decision = response_text.strip().upper()
             logger.debug(f"LLM Relevanzprüfung für '{title}': Entscheidung: {decision}")
@@ -154,8 +138,8 @@ class NewsAggregator:
         return False
 
     def translate_text_with_llm(self, text: str, target_lang: str = "Deutsch") -> str:
-        """Übersetzt Text mit Gemini LLM."""
-        if not self.gemini_api_key or not text or not text.strip():
+        """Übersetzt Text mit Claude."""
+        if not self.llm_available or not text or not text.strip():
             return text if text else ""
 
         prompt_text = f"""
@@ -168,7 +152,7 @@ class NewsAggregator:
         ---
         Übersetzter Text:
         """
-        translated_text = self._call_gemini_api(prompt_text)
+        translated_text = self._call_claude_cli(prompt_text)
         if translated_text:
             logger.debug(f"LLM Übersetzung für '{text[:30].strip()}...': '{translated_text[:30].strip()}...'")
             return translated_text
@@ -218,7 +202,7 @@ class NewsAggregator:
 
                     # Hier wird der Artikel direkt verarbeitet und potenziell gestreamt,
                     # daher geben wir ihn zurück, wenn er relevant ist.
-                    if self.gemini_api_key and self.is_article_relevant_with_llm(original_title, original_summary):
+                    if self.llm_available and self.is_article_relevant_with_llm(original_title, original_summary):
                         logger.info(f"Artikel '{original_title}' von {source_name} ist RELEVANT. Übersetze...")
 
                         is_german_source = source_name in ["Heise Online", "Golem.de", "t3n", "Computerwoche",
@@ -243,7 +227,7 @@ class NewsAggregator:
                             'original_title': original_title
                         }
                         articles.append(article_data)  # Sammeln für Deduplizierung und Sortierung
-                    elif self.gemini_api_key:
+                    elif self.llm_available:
                         logger.info(
                             f"Artikel '{original_title}' von {source_name} ist laut LLM NICHT relevant. Übersprungen.")
                     else:
@@ -396,7 +380,7 @@ class NewsAggregator:
         """Generiert den HTML-Footer."""
         return """
     <div class="footer">
-        <p>Generiert mit IT-Nachrichten Aggregator (v1.3 mit Gemini REST API Streaming) • Alle Rechte bei den jeweiligen Originalquellen</p>
+        <p>Generiert mit IT-Nachrichten Aggregator (v1.3 mit Claude CLI Streaming) • Alle Rechte bei den jeweiligen Originalquellen</p>
     </div>
 </body>
 </html>
@@ -510,7 +494,7 @@ class NewsAggregator:
 
 def main():
     """Hauptfunktion"""
-    logger.info("Starte IT-Nachrichten Aggregator mit Gemini REST API Streaming...")
+    logger.info("Starte IT-Nachrichten Aggregator mit Claude CLI Streaming...")
 
     parser = argparse.ArgumentParser(description="IT-Nachrichten Aggregator")
     parser.add_argument(
@@ -529,11 +513,11 @@ def main():
 
     aggregator = NewsAggregator(config_module)
 
-    if not aggregator.gemini_api_key:
+    if not aggregator.llm_available:
         logger.warning(
-            "Kein GEMINI_API_KEY gefunden. LLM-Funktionalität ist deaktiviert.")
+            "Claude CLI nicht gefunden. LLM-Funktionalität ist deaktiviert.")
 
-    logger.info("Sammle und streame Nachrichten (inkl. LLM-Prüfung und Übersetzung via REST API)...")
+    logger.info("Sammle und streame Nachrichten (inkl. LLM-Prüfung und Übersetzung via Claude CLI)...")
 
     # Die Logik zum Sammeln und Generieren der gesamten HTML ist jetzt in stream_news_to_file
     filename, num_articles, num_sources = aggregator.stream_news_to_file()

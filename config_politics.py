@@ -3,11 +3,12 @@
 # LLM Rate Limiting (in seconds)
 LLM_RATE_LIMIT_SECONDS = 6
 
-# Gemini API Endpoint Template
-GEMINI_API_ENDPOINT_TEMPLATE = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+# Claude wird per CLI (bash) aufgerufen - kein API-Key noetig, die CLI-Session authentifiziert.
+CLAUDE_CLI_PATH = "claude"
 
-# Default Gemini Model Name
-GEMINI_MODEL_NAME = "gemini-1.5-flash" # Or your preferred model
+# Default Claude Model Name
+CLAUDE_MODEL_NAME = "sonnet"  # Or your preferred model (sonnet, opus, haiku, or a full model id)
+CLAUDE_TIMEOUT_SECONDS = 120  # Timeout pro Claude-CLI-Aufruf
 
 # RSS Feeds of major political news sources worldwide
 NEWS_SOURCES = {

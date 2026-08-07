@@ -16,11 +16,11 @@ Das Programm soll als IT-Nachrichten-Aggregator dienen. Es sammelt Nachrichtenar
 *   Artikel sollen anhand einer konfigurierbaren Liste von IT-spezifischen Keywords vorab gefiltert werden. Artikel, die keines dieser Keywords im Titel oder in der Zusammenfassung enthalten, sollen verworfen werden.
 
 ### 2.3. Relevanzprüfung mittels LLM (Large Language Model):
-*   Für Artikel, die den Keyword-Vorfilter passieren, soll eine detailliertere Relevanzprüfung mittels eines LLM (z.B. Google Gemini) durchgeführt werden.
+*   Für Artikel, die den Keyword-Vorfilter passieren, soll eine detailliertere Relevanzprüfung mittels eines LLM durchgeführt werden.
 *   Das LLM soll anhand eines definierten Prompts prüfen, ob der Artikel thematisch zu einer vordefinierten Liste von IT-Kategorien passt.
-*   Die Kommunikation mit dem LLM soll über dessen REST API erfolgen.
-*   Der API-Key für das LLM soll aus einer Umgebungsvariable (`GEMINI_API_KEY`) gelesen werden.
-*   Das zu verwendende LLM-Modell (z.B. "gemini-1.5-flash") soll konfigurierbar sein.
+*   Die Kommunikation mit dem LLM erfolgt ausschließlich über die Claude CLI (`claude -p`, Prompt via stdin). Andere LLM-Anbieter sind nicht zulässig.
+*   Es wird kein API-Key benötigt; die Authentifizierung übernimmt die angemeldete Claude-CLI-Session. Der CLI-Pfad ist über `CLAUDE_CLI_PATH` konfigurierbar.
+*   Das zu verwendende Claude-Modell (z.B. "sonnet") soll über `CLAUDE_MODEL_NAME` konfigurierbar sein.
 *   Die Antwort des LLM zur Relevanz ("JA"/"NEIN") soll ausgewertet werden. Nur als relevant eingestufte Artikel werden weiterverarbeitet.
 
 ### 2.4. Übersetzung mittels LLM:
@@ -28,8 +28,8 @@ Das Programm soll als IT-Nachrichten-Aggregator dienen. Es sammelt Nachrichtenar
 *   Der Prompt für die Übersetzung soll sicherstellen, dass nur der übersetzte Text ohne zusätzliche Phrasen zurückgegeben wird.
 *   Deutschsprachige Quellen sollen von der Übersetzung ausgenommen werden.
 
-### 2.5. LLM API-Drosselung (Rate Limiting):
-*   Um API-Limits des LLM-Anbieters nicht zu überschreiten, muss eine Drosselungsfunktion implementiert werden. Es soll sichergestellt werden, dass maximal alle X Sekunden (konfigurierbar, z.B. 6 Sekunden) eine Anfrage an die LLM-API gesendet wird.
+### 2.5. LLM-Drosselung (Rate Limiting):
+*   Um Limits nicht zu überschreiten, muss eine Drosselungsfunktion implementiert werden. Es soll sichergestellt werden, dass maximal alle X Sekunden (konfigurierbar, z.B. 6 Sekunden) ein Claude-CLI-Aufruf erfolgt.
 
 ### 2.6. Deduplizierung:
 *   Nachdem alle potenziell relevanten Artikel gesammelt und verarbeitet wurden, sollen Duplikate entfernt werden. Die Deduplizierung soll primär auf Basis des normalisierten Originaltitels erfolgen.
@@ -52,16 +52,16 @@ Das Programm soll als IT-Nachrichten-Aggregator dienen. Es sammelt Nachrichtenar
 *   Python 3.x
 
 ### 3.2. Externe Bibliotheken (Beispiele basierend auf aktuellem Code):
-*   `requests`: Für HTTP-Anfragen (RSS-Feeds, LLM-API).
+*   `requests`: Für HTTP-Anfragen (RSS-Feeds).
 *   `feedparser`: Zum Parsen von RSS-Feeds.
-*   Standardbibliotheken: `json`, `datetime`, `time`, `html`, `re`, `os`, `logging`.
+*   Standardbibliotheken: `json`, `datetime`, `time`, `html`, `re`, `os`, `logging`, `subprocess`, `shutil`.
 
 ### 3.3. Konfiguration:
 *   Liste der RSS-Feeds.
 *   Liste der Keywords für den Vorfilter.
 *   Liste der IT-Kategorien für den LLM-Relevanz-Prompt.
-*   LLM-Modellname.
-*   Rate-Limit für LLM-API-Aufrufe.
+*   Claude-Modellname und CLI-Pfad.
+*   Rate-Limit für Claude-CLI-Aufrufe.
 *   Maximale Länge für Artikelzusammenfassungen.
 
 ### 3.4. Fehlerbehandlung und Logging:

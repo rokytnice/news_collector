@@ -1,7 +1,7 @@
 ---
 name: news-reporter
 description: Delivers the final HTML news report rendered from the processed articles, with verified article count and output path.
-tools: Bash, Read, Write
+tools: Bash, Read, Write, Skill
 model: sonnet
 ---
 

@@ -189,7 +189,22 @@ IT_KEYWORDS_IT = [
     'google', 'microsoft', 'apple', 'amazon', 'meta', 'tesla',
     'blockchain', 'cryptocurrency', 'bitcoin', 'web', 'api',
     'machine learning', 'automation', 'robotics', 'iot',
-    'virtual reality', 'augmented reality', 'gaming'
+    'virtual reality', 'augmented reality', 'gaming',
+    # Begriffe zu den neun Kategorien in IT_CATEGORIES_FOR_LLM_PROMPT. Der Vorfilter
+    # soll grosszuegig durchlassen — aussortiert wird im news-relevance-judge, der die
+    # Kategorien kennt. Fehlt hier ein Wort, sieht der Judge den Artikel nie.
+    'llm', 'large language model', 'foundation model', 'transformer', 'neural',
+    'deep learning', 'benchmark', 'arxiv', 'paper', 'research', 'forschung', 'studie',
+    'openai', 'anthropic', 'claude', 'gemini', 'llama', 'mistral', 'deepseek',
+    'agent', 'agentic', 'multi-agent', 'mcp', 'model context protocol', 'tool use',
+    'copilot', 'cursor', 'code generation', 'codegen', 'code assistant', 'pair programming',
+    'humanoid', 'roboter', 'embodied', 'reinforcement learning',
+    'java', 'jdk', 'jvm', 'openjdk', 'jep', 'kotlin', 'maven', 'gradle', 'quarkus',
+    'spring', 'spring boot', 'spring framework', 'broadcom', 'vmware', 'tanzu',
+    'fake shop', 'fakeshop', 'fake-shop', 'scam', 'betrug', 'phishing', 'fraud',
+    'online-betrug', 'verbraucherschutz',
+    'software engineering', 'softwareentwicklung', 'testing', 'verification',
+    'programming language', 'developer productivity', 'technical debt'
 ]
 
 # Simple translation dictionary for important IT terms
@@ -216,16 +231,37 @@ TRANSLATIONS_IT = {
 }
 # Kategorien fuer den news-relevance-judge. Freitext - der Agent liest sie als Massstab.
 IT_CATEGORIES_FOR_LLM_PROMPT = """
-- Softwareentwicklung: Programmiersprachen, Frameworks, Tools, Entwicklerpraxis
-- KI und Machine Learning: Modelle, Anwendungen, Forschung, Regulierung
-- IT-Sicherheit: Schwachstellen, Angriffe, Datenlecks, Kryptografie
-- Cloud und Infrastruktur: Betrieb, Container, Netzwerke, Rechenzentren
-- Daten und Datenbanken: Speicherung, Analyse, Datenschutz aus technischer Sicht
-- Hardware und Chips: Prozessoren, Geraete, Halbleiterindustrie
-- Open Source: Projekte, Lizenzen, Communities
-- Tech-Branche: relevante Produkt- und Unternehmensnachrichten mit technischem Kern
+Die folgenden neun Kategorien sind der vollstaendige Massstab. Ein Artikel ist nur dann
+relevant, wenn er sich einer davon substanziell zuordnen laesst.
 
-NICHT relevant: reine Kaufberatung und Produkttests ohne technischen Kern, Werbung und
-Affiliate-Inhalte, Gaming-Unterhaltung ohne Technikbezug, Consumer-Lifestyle,
-allgemeine Wirtschafts- oder Politiknachrichten ohne IT-Bezug.
+- KI-Forschung: Paper, neue Modelle und Architekturen, Benchmarks, Evaluations- und
+  Interpretierbarkeitsarbeiten, Trainingsverfahren. Auch Preprints und Ergebnisse aus
+  Forschungsgruppen und Industrielaboren.
+- KI und Robotik: verkoerperte KI, Robot Learning, humanoide und mobile Roboter,
+  Manipulation, Vision-Language-Action-Modelle, Autonomie in der physischen Welt.
+- KI-Codegenerierung: Modelle und Werkzeuge, die Code schreiben, ergaenzen, testen oder
+  reviewen — inklusive Qualitaets-, Sicherheits- und Produktivitaetsstudien dazu.
+- Agentic Coding: Coding-Agenten in der Praxis — Claude Code, Cursor, Copilot Agents,
+  Aider und Vergleichbares; Workflows, Tool-Use, Erfahrungsberichte, Grenzen.
+- Agentic Engineering: Bauen von Agentensystemen — Orchestrierung, Multi-Agenten-Muster,
+  Speicher und Kontext, Tool- und MCP-Anbindung, Evaluation und Betrieb von Agenten.
+- Java: Sprache und Plattform — JDK-Releases, JEPs, JVM, Performance, Bibliotheken,
+  Build-Tooling (Maven, Gradle), relevante Java-Frameworks.
+- Broadcom und Spring: Spring Framework, Spring Boot, Spring AI und das uebrige
+  Spring-Oekosystem; dazu VMware/Tanzu und Broadcom-Entscheidungen, die Lizenzierung,
+  Support oder Roadmap dieser Produkte betreffen.
+- Fake Shops und Online-Betrug: betruegerische Shops, Scam-Netzwerke, Phishing im Handel,
+  Erkennungsverfahren und Abwehr, Rechtsprechung und Verbraucherschutz dazu.
+- Software-Forschung: Forschung ueber Softwareentwicklung selbst — Empirical Software
+  Engineering, Programmiersprachen- und Verifikationsforschung, Studien zu Entwickler-
+  produktivitaet, Testverfahren, Wartbarkeit, technischer Schuld.
+
+NICHT relevant, auch wenn ein Stichwort passt: reine Kaufberatung und Produkttests,
+Werbung und Affiliate-Inhalte, Gaming ohne Technikbezug, Consumer-Lifestyle, allgemeine
+Wirtschafts- und Politiknachrichten, Kursnachrichten zu Krypto oder Tech-Aktien,
+Firmen-PR ohne fachlichen Kern.
+
+Allgemeine IT-Themen ohne Bezug zu den neun Kategorien — etwa ein Smartphone-Launch, eine
+Cloud-Preisaenderung oder eine beliebige CVE-Meldung — sind ausdruecklich NICHT relevant.
+Das ist die wesentliche Verschaerfung gegenueber der frueheren, breiten IT-Liste.
 """

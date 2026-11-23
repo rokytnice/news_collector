@@ -1,7 +1,7 @@
 ---
 name: news-relevance-judge
 description: Delivers relevance decisions for news candidates against the config categories, writing a relevant-only JSONL with a one-line reason per article.
-tools: Bash, Read, Write
+tools: Bash, Read, Write, Skill
 model: sonnet
 ---
 
@@ -28,6 +28,8 @@ Eingabe: Kandidaten-JSONL vom `news-fetcher` (ein JSON-Objekt pro Zeile mit
 3. Entscheide pro Artikel: relevant ja/nein, dazu eine Begründung von maximal 12 Wörtern.
 4. Schreib **nur die relevanten** Artikel als JSONL heraus — alle Felder des Originals
    unverändert übernehmen, plus `"relevant": true` und `"reason": "<Begründung>"`.
+   „Alle Felder" schließt `image` ein (Bild-URL aus dem Feed, oft leer): Wer die Zeilen
+   neu zusammensetzt statt sie durchzureichen, verliert das Bild aus dem Report.
    Titel und Zusammenfassung dabei **nicht** anfassen, nicht kürzen, nicht übersetzen —
    das macht der `news-translator`.
 

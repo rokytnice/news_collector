@@ -101,6 +101,60 @@ def normalize_title(title: str) -> str:
     return re.sub(r'[^\w\s]', '', title.lower()).strip()
 
 
+# Zaehlpixel und Spacer-GIFs, die in Feeds als "Bild" durchgehen wuerden.
+TRACKING_IMAGE_HINTS = (
+    'feedburner', 'feedsportal', 'doubleclick', 'pixel', '/track', 'tracker',
+    'stat?', 'analytics', 'spacer.gif', 'blank.gif', '1x1',
+)
+
+IMG_SRC_RE = re.compile(r'<img[^>]+src=["\']([^"\']+)["\']', re.IGNORECASE)
+
+
+def is_usable_image(url: str) -> bool:
+    """Bild-URL plausibel? Filtert Zaehlpixel, data:-URIs und Nicht-HTTP heraus."""
+    if not url or not url.startswith(('http://', 'https://')):
+        return False
+    lowered = url.lower()
+    return not any(hint in lowered for hint in TRACKING_IMAGE_HINTS)
+
+
+def extract_image(entry) -> str:
+    """
+    Artikelbild aus einem Feed-Eintrag ziehen.
+
+    Feeds transportieren Bilder auf mindestens fuenf Wegen und kaum zwei Quellen
+    nutzen denselben — deshalb der Reihe nach durchprobieren, von der explizitesten
+    Auszeichnung zur unsichersten (ein <img> irgendwo im HTML des Textes).
+    Kein Bild ist ein normaler Fall, kein Fehler: dann bleibt das Feld leer.
+    """
+    # media:content und media:thumbnail (Media RSS) — die haeufigste explizite Auszeichnung
+    for attr in ('media_content', 'media_thumbnail'):
+        for item in getattr(entry, attr, None) or []:
+            candidate = (item or {}).get('url', '')
+            if is_usable_image(candidate):
+                return candidate
+
+    # Enclosures: <enclosure type="image/jpeg" url="..."> bzw. als link rel="enclosure"
+    for item in (getattr(entry, 'enclosures', None) or []) + (getattr(entry, 'links', None) or []):
+        item = item or {}
+        if not (item.get('type') or '').startswith('image/'):
+            continue
+        candidate = item.get('href') or item.get('url') or ''
+        if is_usable_image(candidate):
+            return candidate
+
+    # Letzter Ausweg: erstes <img> im Volltext oder in der Zusammenfassung
+    blobs = [c.get('value', '') for c in (getattr(entry, 'content', None) or [])]
+    blobs.append(getattr(entry, 'summary', '') or '')
+    for blob in blobs:
+        for match in IMG_SRC_RE.findall(blob):
+            candidate = html.unescape(match)
+            if is_usable_image(candidate):
+                return candidate
+
+    return ''
+
+
 def fetch_source(url: str, source_name: str, keywords: List[str], cutoff: datetime,
                  german_sources: List[str], summary_chars: int) -> List[Dict]:
     """Einen Feed holen und die Kandidaten des Zeitfensters zurueckgeben."""
@@ -140,6 +194,7 @@ def fetch_source(url: str, source_name: str, keywords: List[str], cutoff: dateti
                 'published': pub_date.isoformat(),
                 'source': source_name,
                 'is_german_source': source_name in german_sources,
+                'image': extract_image(entry),
             })
         except Exception as e:
             logger.warning(f"[{source_name}] Artikel uebersprungen: {e}")
@@ -234,7 +289,7 @@ HTML_ARTICLE = """    <div class="article">
             <span class="source-tag">{source}</span>
             <span>{published} Uhr</span>
         </div>
-        <div class="article-summary">{summary}</div>
+{image}        <div class="article-summary">{summary}</div>
         <a href="{link}" target="_blank" class="article-link" rel="noopener noreferrer">
             📖 Vollständigen Artikel lesen
         </a>
@@ -270,6 +325,25 @@ def format_published(value: str) -> str:
         return value or ""
 
 
+def render_image(article: Dict) -> str:
+    """
+    Bild-Block eines Artikels — leerer String, wenn der Feed kein Bild geliefert hat.
+
+    `onerror` blendet das Bild aus, statt ein kaputtes Symbol stehen zu lassen: die
+    URLs zeigen auf fremde Server, von denen einzelne beim Oeffnen des Reports laengst
+    404 liefern oder Hotlinking blockieren.
+    """
+    url = (article.get('image') or '').strip()
+    if not is_usable_image(url):
+        return ''
+    return (
+        '        <div class="article-image">\n'
+        f'            <img src="{html.escape(url, quote=True)}" alt="" loading="lazy"\n'
+        '                 referrerpolicy="no-referrer" onerror="this.parentNode.remove()">\n'
+        '        </div>\n'
+    )
+
+
 def cmd_render(args) -> int:
     articles = read_jsonl(args.infile)
     if args.only_relevant:
@@ -300,6 +374,7 @@ def cmd_render(args) -> int:
                     title=html.escape(article.get('title', '')),
                     source=html.escape(article.get('source', '')),
                     published=format_published(article.get('published', '')),
+                    image=render_image(article),
                     summary=html.escape(summary),
                     link=html.escape(article.get('link', '')),
                 ))
@@ -390,6 +465,17 @@ CSS = """
             color: #6c757d;
             font-size: 0.9em;
             margin-bottom: 10px;
+        }
+        .article-image {
+            margin: 0 0 15px;
+        }
+        .article-image img {
+            display: block;
+            width: 100%;
+            max-height: 320px;
+            object-fit: cover;
+            border-radius: 8px;
+            background: #e9ecef;
         }
         .article-summary {
             color: #495057;

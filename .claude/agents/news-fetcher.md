@@ -1,7 +1,7 @@
 ---
 name: news-fetcher
 description: Delivers RSS candidate collection results with candidate counts per source and a candidates JSONL ready for relevance judging.
-tools: Bash, Read, Write
+tools: Bash, Read, Write, Skill
 model: sonnet
 ---
 

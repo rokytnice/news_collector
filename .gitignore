@@ -5,6 +5,7 @@ __pycache__/
 _tmp/
 _work/
 _reports/
+_logs/
 
 # Generierte Nachrichten-Reports
 it_nachrichten_llm_rest_stream_*.html

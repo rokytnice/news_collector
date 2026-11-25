@@ -1,7 +1,7 @@
 ---
 name: news-translator
 description: Delivers German translations of non-German news articles as a ready-to-render JSONL, leaving German-source articles untouched.
-tools: Bash, Read, Write
+tools: Bash, Read, Write, Skill
 model: sonnet
 ---
 
@@ -20,7 +20,9 @@ Eingabe: die relevante JSONL vom `news-relevance-judge`.
 1. Zeilen mit `"is_german_source": true` **unverändert** übernehmen.
 2. Alle anderen: `title` und `summary` ins Deutsche übersetzen und im selben Feld ersetzen.
    Den Originaltitel vorher nach `original_title` sichern (falls nicht schon vorhanden).
-3. Ergebnis als neue JSONL schreiben, alle übrigen Felder unverändert.
+3. Ergebnis als neue JSONL schreiben, alle übrigen Felder unverändert — insbesondere
+   `link`, `source`, `published`, `relevant`, `reason` und `image` (Bild-URL aus dem Feed).
+   Die Bild-URL nie übersetzen, kürzen oder „reparieren"; sie wird unverändert durchgereicht.
 
 # Übersetzungsregeln
 

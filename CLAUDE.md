@@ -40,6 +40,21 @@ danach `cat` zu einer Datei. Die Configs haben ~200 Quellen; ein serieller Fetch
 mehrere Minuten. `news-relevance-judge` und `news-translator` bei großen Mengen ebenfalls
 in Blöcke aufteilen, aber pro Block ein Agent, nicht pro Artikel.
 
+## Nachtlauf
+
+`scripts/nightly.sh` läuft per Cron täglich um 05:00 und startet `claude -p` mit
+`scripts/nightly_prompt.md`. Dieser Claude-Orchestrator steuert die vier Agenten für alle
+drei Configs nacheinander und meldet am Ende per `scripts/notify_telegram.sh`.
+
+Die Trennung ist Absicht: das Shell-Skript stellt nur die Umgebung her (PATH, Secrets aus
+`/run/user/<uid>/secrets.env`, Session-ID, Log) und sendet einen Notruf, falls Claude gar
+nicht hochkommt. Jede Entscheidung — Quellenaufteilung, Umgang mit Ausfällen, Inhalt der
+Meldung — trifft der Orchestrator. Kein `claude -p` aus Python; hier startet die Shell den
+Agenten, statt dass Code ein LLM zum Denken aufruft.
+
+Logs: `_logs/nightly_<stamp>.log` (nicht in Git). Nachvollziehen mit
+`claude --resume <session-id>` — die ID steht in der ersten Logzeile und in der Telegram-Meldung.
+
 ## Configs
 
 `config_it.py`, `config_coding.py`, `config_politics.py` — je `NEWS_SOURCES`,
@@ -54,3 +69,14 @@ Agenten-Pipeline nicht mehr gelesen.
 
 - Zwischenstände: `_work/news/<run>/` (nicht in Git)
 - Reports: `it_nachrichten_*.html` im Projekt-Root (nicht in Git, siehe `.gitignore`)
+
+## Wissen festhalten — gilt auch für die Agenten dieses Projekts
+
+Nach jedem substantiellen Lauf prüfen: Architektur-Entscheidung getroffen? Fehler analysiert und
+behoben? Nicht-triviales Feature? Gotcha entdeckt, der künftige Läufe Stunden kostet? → als
+thematische Datei nach `_wiki/` (Projekt-Root, wird committet; jede Datei beginnt mit
+`_Zuletzt aktualisiert: YYYY-MM-DD_`). **Nicht** für Typos, Umbenennungen oder Dinge, für die der
+Code selbst spricht — und **nicht** für Lauf-Ergebnisse, die gehören nach `_reports/`.
+
+Das ist die globale Regel §6; sie steht hier, weil Agenten die Projekt-`CLAUDE.md` mitlesen, ihre
+eigene Definition unter `.claude/agents/` sie aber nicht erwähnt.
